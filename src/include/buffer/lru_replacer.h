@@ -46,7 +46,12 @@ class LRUReplacer : public Replacer {
   size_t Size() override;
 
  private:
-  // TODO(student): implement me!
+  // The cache to store all pages in frame_id_t.
+  // The head is least recently used. 
+  // The tail is most recently used.
+  std::vector<frame_id_t> lru_cache_;
+
+  int current_element_;
 };
 
 }  // namespace bustub
