@@ -16,6 +16,7 @@
 #include <mutex>  // NOLINT
 #include <unordered_map>
 
+#include "common/logger.h"
 #include "buffer/buffer_pool_manager.h"
 #include "buffer/lru_replacer.h"
 #include "recovery/log_manager.h"
@@ -101,7 +102,7 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   void FlushAllPgsImp() override;
 
   /**
-   * Allocate a page on disk.∂
+   * Allocate a page on disk.
    * @return the id of the allocated page
    */
   page_id_t AllocatePage();
@@ -111,8 +112,11 @@ class BufferPoolManagerInstance : public BufferPoolManager {
    * @param page_id id of the page to deallocate
    */
   void DeallocatePage(__attribute__((unused)) page_id_t page_id) {
+    LOG_INFO("In DeallocatePage, deallocate page %d", page_id);
     // This is a no-nop right now without a more complex data structure to track deallocated pages
   }
+
+  frame_id_t FindPageByPageId(page_id_t page_id);
 
   /**
    * Validate that the page_id being used is accessible to this BPI. This can be used in all of the functions to
@@ -120,6 +124,9 @@ class BufferPoolManagerInstance : public BufferPoolManager {
    * @param page_id
    */
   void ValidatePageId(page_id_t page_id) const;
+
+  /* Get available frame id, return -1 if cannot find. */
+  frame_id_t GetVictimPageFromListOrReplacer();
 
   /** Number of pages in the buffer pool. */
   const size_t pool_size_;
