@@ -47,7 +47,7 @@ class LRUReplacer : public Replacer {
 
  private:
   // The cache to store all pages in frame_id_t.
-  // The head is least recently used. 
+  // The head is least recently used.
   // The tail is most recently used.
   std::vector<frame_id_t> lru_cache_;
 

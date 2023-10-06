@@ -12,7 +12,11 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "buffer/buffer_pool_manager.h"
+#include "buffer/buffer_pool_manager_instance.h"
 #include "recovery/log_manager.h"
 #include "storage/disk/disk_manager.h"
 #include "storage/page/page.h"
@@ -23,7 +27,7 @@ class ParallelBufferPoolManager : public BufferPoolManager {
  public:
   /**
    * Creates a new ParallelBufferPoolManager.
-   * @param the number of individual BufferPoolManagerInstances to store
+   * @param num_instances the number of individual BufferPoolManagerInstances to store
    * @param pool_size the pool size of each BufferPoolManagerInstance
    * @param disk_manager the disk manager
    * @param log_manager the log manager (for testing only: nullptr = disable logging)
@@ -86,5 +90,22 @@ class ParallelBufferPoolManager : public BufferPoolManager {
    * Flushes all the pages in the buffer pool to disk.
    */
   void FlushAllPgsImp() override;
+
+  // how many buffer pool instance in this parallel buffer pool.
+  size_t num_instances_;
+
+  // what's the pool size for each buffer pool.
+  size_t pool_size_;
+
+  // A list of buffer_pool_manager.
+  std::vector<std::unique_ptr<BufferPoolManager>> buffer_pool_manager_instances_;
+
+  // Locks for each instance.
+  std::vector<std::mutex> locks_;
+
+  // From which instance to get the page.
+  size_t candidate_instance_index_;
+
+  std::mutex new_page_lock_;
 };
 }  // namespace bustub

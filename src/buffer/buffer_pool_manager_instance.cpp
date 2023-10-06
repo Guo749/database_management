@@ -12,13 +12,12 @@
 
 #include "buffer/buffer_pool_manager_instance.h"
 
-#include "common/macros.h"
 #include "common/config.h"
 #include "common/logger.h"
+#include "common/macros.h"
 #include "storage/page/page.h"
 
 namespace bustub {
-
 
 BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, DiskManager *disk_manager,
                                                      LogManager *log_manager)
@@ -60,7 +59,7 @@ bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) {
     return false;
   }
 
-  Page& page = pages_[frame_id];
+  Page &page = pages_[frame_id];
   if (page.IsDirty()) {
     disk_manager_->WritePage(page_id, page.GetData());
     LOG_INFO("Page %d is dirty, writing it back to disk.", page.GetPageId());
@@ -73,12 +72,12 @@ bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) {
 
 void BufferPoolManagerInstance::FlushAllPgsImp() {
   for (size_t i = 0; i < pool_size_; i++) {
-    Page& page = pages_[i];
+    Page &page = pages_[i];
     if (page.GetPageId() == INVALID) {
       continue;
     }
 
-    if (page.IsDirty()){
+    if (page.IsDirty()) {
       disk_manager_->WritePage(page.GetPageId(), page.GetData());
     }
   }
@@ -105,10 +104,10 @@ Page *BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) {
     LOG_INFO("Cannot get frame id from either replacer or free_list.");
     return nullptr;
   }
-  
+
   // 3.   Update P's metadata, zero out memory and add P to the page table.
   page_id_t new_page = AllocatePage();
-  Page& page = pages_[frame_id];
+  Page &page = pages_[frame_id];
   // Before reset the memory, make sure the victim's data is written to db.
   FlushPgImp(page.GetPageId());
 
@@ -127,6 +126,9 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
   frame_id_t frame_id = FindPageByPageId(page_id);
   // 1.1    If P exists, pin it and return it immediately.
   if (frame_id != -1) {
+    Page& page = pages_[frame_id];
+    page.pin_count_ += 1;
+
     return pages_ + frame_id;
   }
 
@@ -139,7 +141,7 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
   }
 
   // 2.     If R is dirty, write it back to the disk.
-  Page& page = pages_[new_frame];
+  Page &page = pages_[new_frame];
   if (page.IsDirty()) {
     FlushPgImp(page.GetPageId());
   }
@@ -166,11 +168,10 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
     return true;
   }
 
-  Page& page = pages_[frame_id];
+  Page &page = pages_[frame_id];
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
   if (page.GetPinCount() != 0) {
-    LOG_INFO("When delete the page,  pin count is %d, cannot delete it.",
-      page.GetPinCount());
+    LOG_INFO("When delete the page,  pin count is %d, cannot delete it.", page.GetPinCount());
     return false;
   }
 
@@ -185,14 +186,14 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
   return true;
 }
 
-bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) { 
+bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
   frame_id_t frame_id = FindPageByPageId(page_id);
   if (frame_id == -1) {
     LOG_WARN("Cannot unpin the page %d, since it is not in the buffer pool.", page_id);
     return false;
   }
 
-  Page& page = pages_[frame_id];
+  Page &page = pages_[frame_id];
   if (page.pin_count_ <= 0) {
     LOG_INFO("Unpin a page %d with pin count = 0.", page_id);
     return false;
@@ -205,7 +206,7 @@ bool BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) {
     replacer_->Unpin(frame_id);
   }
 
-  return true; 
+  return true;
 }
 
 page_id_t BufferPoolManagerInstance::AllocatePage() {

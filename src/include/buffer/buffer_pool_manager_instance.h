@@ -16,9 +16,9 @@
 #include <mutex>  // NOLINT
 #include <unordered_map>
 
-#include "common/logger.h"
 #include "buffer/buffer_pool_manager.h"
 #include "buffer/lru_replacer.h"
+#include "common/logger.h"
 #include "recovery/log_manager.h"
 #include "storage/disk/disk_manager.h"
 #include "storage/page/page.h"
