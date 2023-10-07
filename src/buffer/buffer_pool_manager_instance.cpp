@@ -182,7 +182,9 @@ bool BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) {
 
   page.ResetMemory();
   page.page_id_ = INVALID_PAGE_ID;
+  // Add to free list and delete from replacer
   free_list_.push_back(frame_id);
+  replacer_->Pin(frame_id);
   return true;
 }
 
