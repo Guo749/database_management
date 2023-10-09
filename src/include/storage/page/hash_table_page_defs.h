@@ -42,3 +42,9 @@
  * to maintain the occupied and readable flags for a key value pair.
  */
 #define BUCKET_ARRAY_SIZE (4 * PAGE_SIZE / (4 * sizeof(MappingType) + 1))
+
+/**
+ * Array size of the occupied_ in hash_table bucket page
+ *
+ */
+#define OCCUPIED_ARRAY_SIZE ((BUCKET_ARRAY_SIZE - 1) / 8 + 1)

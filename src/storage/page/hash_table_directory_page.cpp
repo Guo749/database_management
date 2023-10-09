@@ -26,29 +26,36 @@ void HashTableDirectoryPage::SetLSN(lsn_t lsn) { lsn_ = lsn; }
 
 uint32_t HashTableDirectoryPage::GetGlobalDepth() { return global_depth_; }
 
-uint32_t HashTableDirectoryPage::GetGlobalDepthMask() { return 0; }
+uint32_t HashTableDirectoryPage::GetGlobalDepthMask() { return (pow(2, global_depth_) - 1); }
 
 void HashTableDirectoryPage::IncrGlobalDepth() {}
 
 void HashTableDirectoryPage::DecrGlobalDepth() { global_depth_--; }
 
-page_id_t HashTableDirectoryPage::GetBucketPageId(uint32_t bucket_idx) { return 0; }
+page_id_t HashTableDirectoryPage::GetBucketPageId(uint32_t bucket_idx) { return bucket_page_ids_[bucket_idx]; }
 
-void HashTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id_t bucket_page_id) {}
+void HashTableDirectoryPage::SetBucketPageId(uint32_t bucket_idx, page_id_t bucket_page_id) {
+  bucket_page_ids_[bucket_idx] = bucket_page_id;
+}
 
-uint32_t HashTableDirectoryPage::Size() { return 0; }
+uint32_t HashTableDirectoryPage::Size() { return pow(2, global_depth_); }
 
 bool HashTableDirectoryPage::CanShrink() { return false; }
 
-uint32_t HashTableDirectoryPage::GetLocalDepth(uint32_t bucket_idx) { return 0; }
+uint32_t HashTableDirectoryPage::GetLocalDepth(uint32_t bucket_idx) { return local_depths_[bucket_idx]; }
 
-void HashTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t local_depth) {}
+void HashTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t local_depth) {
+  local_depths_[bucket_idx] = local_depth;
+}
 
 void HashTableDirectoryPage::IncrLocalDepth(uint32_t bucket_idx) {}
 
 void HashTableDirectoryPage::DecrLocalDepth(uint32_t bucket_idx) {}
 
-uint32_t HashTableDirectoryPage::GetLocalHighBit(uint32_t bucket_idx) { return 0; }
+uint32_t HashTableDirectoryPage::GetLocalHighBit(uint32_t bucket_idx) {
+  uint32_t local_mask = pow(2, GetLocalDepth(bucket_idx)) - 1;
+  return local_mask;
+}
 
 /**
  * VerifyIntegrity - Use this for debugging but **DO NOT CHANGE**
@@ -69,6 +76,7 @@ void HashTableDirectoryPage::VerifyIntegrity() {
   for (uint32_t curr_idx = 0; curr_idx < Size(); curr_idx++) {
     page_id_t curr_page_id = bucket_page_ids_[curr_idx];
     uint32_t curr_ld = local_depths_[curr_idx];
+    // Assert All LD <= GD
     assert(curr_ld <= global_depth_);
 
     ++page_id_to_count[curr_page_id];
@@ -96,6 +104,8 @@ void HashTableDirectoryPage::VerifyIntegrity() {
       LOG_WARN("Verify Integrity: curr_count: %u, required_count %u, for page_id: %u", curr_ld, required_count,
                curr_page_id);
       PrintDirectory();
+
+      // The LD is the same at each index with the same bucket_page_id
       assert(curr_count == required_count);
     }
     it++;

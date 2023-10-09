@@ -81,7 +81,7 @@ class HashTableBucketPage {
   ValueType ValueAt(uint32_t bucket_idx) const;
 
   /**
-   * Remove the KV pair at bucket_idx
+   * Remove the KV pair at bucket_idx, it means this entry is occupied, but not readable
    */
   void RemoveAt(uint32_t bucket_idx);
 
@@ -138,6 +138,7 @@ class HashTableBucketPage {
   void PrintBucket();
 
  private:
+  bool ExistInArray(KeyType key_type, ValueType value_type, KeyComparator cmp);
   //  For more on BUCKET_ARRAY_SIZE see storage/page/hash_table_page_defs.h
   char occupied_[(BUCKET_ARRAY_SIZE - 1) / 8 + 1];
   // 0 if tombstone/brand new (never occupied), 1 otherwise.
