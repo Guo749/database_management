@@ -126,7 +126,7 @@ Page *BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) {
   frame_id_t frame_id = FindPageByPageId(page_id);
   // 1.1    If P exists, pin it and return it immediately.
   if (frame_id != -1) {
-    Page& page = pages_[frame_id];
+    Page &page = pages_[frame_id];
     page.pin_count_ += 1;
 
     return pages_ + frame_id;

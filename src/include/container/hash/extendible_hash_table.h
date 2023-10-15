@@ -14,6 +14,7 @@
 
 #include <queue>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "buffer/buffer_pool_manager.h"
@@ -138,6 +139,7 @@ class ExtendibleHashTable {
 
   /**
    * Performs insertion with an optional bucket splitting.
+   * Note this is thread-unsafe.
    *
    * @param transaction a pointer to the current transaction
    * @param key the key to insert
@@ -161,6 +163,10 @@ class ExtendibleHashTable {
    */
   void Merge(Transaction *transaction, const KeyType &key, const ValueType &value);
 
+  void CreatePageAndUpdateDirectory(const KeyType &key, const ValueType &value, page_id_t *old_full_page_id);
+
+  // Page name :)
+  std::string name_;
   // member variables
   page_id_t directory_page_id_;
   BufferPoolManager *buffer_pool_manager_;
@@ -169,6 +175,16 @@ class ExtendibleHashTable {
   // Readers includes inserts and removes, writers are splits and merges
   ReaderWriterLatch table_latch_;
   HashFunction<KeyType> hash_fn_;
+
+  // How many bucket pages we have.
+  uint32_t cur_pages_count;
+
+  // Mapping between page id and lsb value in this bucket page.
+  // eg:
+  // page id 0, lsb value 00
+  // page id 1, lsb value 01 (split)
+  // page id 2, lsb value 11 (split)
+  std::unordered_map<page_id_t, uint32_t> lookup_page_lsb_value_;
 };
 
 }  // namespace bustub

@@ -12,11 +12,11 @@
 
 #include <iostream>
 
-#include "storage/page/hash_table_bucket_page.h"
 #include "common/logger.h"
 #include "common/util/hash_util.h"
 #include "storage/index/generic_key.h"
 #include "storage/index/hash_comparator.h"
+#include "storage/page/hash_table_bucket_page.h"
 #include "storage/table/tmp_tuple.h"
 
 namespace bustub {
@@ -24,7 +24,7 @@ namespace bustub {
 constexpr uint32_t kCharBit = 8;
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-bool HASH_TABLE_BUCKET_TYPE::ExistInArray(KeyType key_type, ValueType value_type, KeyComparator cmp) {
+bool HASH_TABLE_BUCKET_TYPE::KeyExistInArray(KeyType key_type, KeyComparator cmp) {
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
     if (IsReadable(i)) {
       if (cmp(KeyAt(i), key_type) == 0) {
@@ -37,8 +37,22 @@ bool HASH_TABLE_BUCKET_TYPE::ExistInArray(KeyType key_type, ValueType value_type
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
+bool HASH_TABLE_BUCKET_TYPE::KeyAndValueExistInArray(KeyType key_type, ValueType value_type, KeyComparator cmp) {
+  for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
+    if (IsReadable(i)) {
+      if ((cmp(KeyAt(i), key_type) == 0) && ValueAt(i) == value_type) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vector<ValueType> *result) {
   bool found_res = false;
+  PrintBucket();
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
     if (IsReadable(i)) {
       if (cmp(KeyAt(i), key) == 0) {
@@ -52,12 +66,12 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
-  if (IsFull() || ExistInArray(key, value, cmp)) {
+  if (IsFull() || KeyAndValueExistInArray(key, value, cmp)) {
+    LOG_WARN("Cannot insert element since it is full or already exist");
     return false;
   }
 
   // Find one empty slot
-  LOG_INFO("Bucket array size is %zu", BUCKET_ARRAY_SIZE);
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
     if (!IsOccupied(i)) {
       LOG_INFO("Inserting element into %zu", i);
@@ -66,6 +80,7 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 
       SetOccupied(i);
       SetReadable(i);
+      PrintBucket();
       return true;
     }
   }
@@ -78,14 +93,14 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator cmp) {
   PrintBucket();
   // Not found.
-  if (IsEmpty() || !ExistInArray(key, value, cmp)) {
+  if (IsEmpty() || !KeyExistInArray(key, cmp)) {
     return false;
   }
 
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
     if (IsOccupied(i) && IsReadable(i)) {
       if (cmp(key, KeyAt(i)) == 0) {
-        // if i = 3, 
+        // if i = 3,
         // 1 << (i % kCharBit) = 1000
         // ~ = 0111
         char mask = ~(1 << (i % kCharBit));
@@ -179,6 +194,18 @@ bool HASH_TABLE_BUCKET_TYPE::IsEmpty() {
     }
   }
   return true;
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
+std::vector<std::pair<KeyType, ValueType>> HASH_TABLE_BUCKET_TYPE::GetAllElements() {
+  std::vector<std::pair<KeyType, ValueType>> res = {};
+  for (uint32_t i = 0; i < BUCKET_ARRAY_SIZE; i++) {
+    if (IsReadable(i)) {
+      res.push_back(array_[i]);
+    }
+  }
+
+  return res;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
