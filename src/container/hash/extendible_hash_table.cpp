@@ -24,9 +24,7 @@
 
 namespace bustub {
 namespace {
-uint32_t MaskByLocalDepth(uint32_t candidate, uint32_t local_depth) {
-  return ((1 << local_depth) - 1) & candidate;
-}
+uint32_t MaskByLocalDepth(uint32_t candidate, uint32_t local_depth) { return ((1 << local_depth) - 1) & candidate; }
 }  // namespace
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -87,15 +85,15 @@ HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_i
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) {
-  table_latch_.RLock();
+  // table_latch_.RLock();
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
-  directory_page->PrintDirectory();
   uint32_t bucket_index = KeyToDirectoryIndex(key, directory_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(directory_page->GetBucketPageId(bucket_index));
 
   bool res = bucket_page->GetValue(key, comparator_, result);
+  PrintDirectory("In GetValue");
 
-  table_latch_.RUnlock();
+  // table_latch_.RUnlock();
   return res;
 }
 
@@ -104,14 +102,14 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  table_latch_.WLock();
+  // table_latch_.WLock();
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   LOG_INFO("Begin writing.... \n");
   std::cout << "Inserting " << key << " -> " << value << std::endl;
   // Initial call
   if (directory_page->GetGlobalDepth() == 0) {
     bool insert_result = SplitInsert(transaction, key, value);
-    table_latch_.WUnlock();
+    // table_latch_.WUnlock();
     return insert_result;
   }
 
@@ -119,15 +117,22 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(directory_page->GetBucketPageId(bucket_index));
 
+  if (bucket_page->KeyAndValueExistInArray(key, value, comparator_)){
+    LOG_WARN("Key and value has already exsit");
+    return false;
+  }
+
   if (bucket_page->IsFull()) {
     std::cout << "Current bucket index " << bucket_index << " is full, need split " << std::endl;
     bool insert_result = SplitInsert(transaction, key, value);
-    table_latch_.WUnlock();
+    // table_latch_.WUnlock();
     return insert_result;
   }
 
+
+
   bool insert_result = bucket_page->Insert(key, value, comparator_);
-  table_latch_.WUnlock();
+  // table_latch_.WUnlock();
   LOG_INFO("End Writing...\n");
   return insert_result;
 }
@@ -149,11 +154,11 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
     bucket_page->RemoveAllElements();
   }
 
+  PrintDirectory("in SplitInsert");
   pairs_to_add.push_back({key, value});
 
   // Insert them all.
   for (const auto &the_pair : pairs_to_add) {
-    std::cout << the_pair.first << " hello wenchao " << the_pair.second << "\n";
     uint32_t bucket_index = KeyToDirectoryIndex(the_pair.first, FetchDirectoryPage());
     HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(FetchDirectoryPage()->GetBucketPageId(bucket_index));
     // All bucket pages should have enough place to add.
@@ -172,10 +177,8 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const ValueType &value,
                                                    page_id_t *old_full_page_id) {
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
-  directory_page->IncrGlobalDepth();
-  uint32_t new_global_depth = directory_page->GetGlobalDepth();
-
-  if (new_global_depth == 1) {
+  if (GetGlobalDepth() == 0) {
+    directory_page->IncrGlobalDepth();
     *old_full_page_id = -1;
 
     for (int i = 0; i < 2; i++) {
@@ -195,15 +198,15 @@ void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const Val
     return;
   }
 
+  PrintDirectory("In create page");
   // create one new page is enough
   page_id_t new_bucket_page_id;
   Page *new_bucket_page = buffer_pool_manager_->NewPage(&new_bucket_page_id);
   if (new_bucket_page == nullptr) {
     LOG_ERROR("When split insert, cannot allocate new page");
     return;
-  }else {
+  } else {
     LOG_INFO("Create a new page");
-    std::cout << key << std::endl;
   }
 
   // for old page, lsb stay the same
@@ -213,13 +216,24 @@ void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const Val
   page_id_t old_page_id = directory_page->GetBucketPageId(old_bucket_index);
   *old_full_page_id = old_page_id;
 
+  directory_page->IncrGlobalDepth();
+
   uint32_t original_local_depth = directory_page->GetLocalDepth(old_bucket_index);
-  std::cout << "old bucket index" << old_bucket_index << " ld" << original_local_depth << "?\n";
-  directory_page->SetLocalDepth(old_bucket_index, original_local_depth + 1);
+  for (int i = 0; i < DIRECTORY_ARRAY_SIZE; i++) {
+    page_id_t page_id = directory_page->GetBucketPageId(i);
+    if (page_id == 0){
+      LOG_INFO("Page id %d == 0", page_id);
+      break;
+    }
+
+    if (page_id == old_page_id){
+      directory_page->SetLocalDepth(i, original_local_depth + 1);
+    }
+  }
 
   // update new pages
   directory_page->SetBucketPageId(cur_pages_count, new_bucket_page_id);
-  directory_page->SetLocalDepth(cur_pages_count, directory_page->GetLocalDepth(old_bucket_index));
+  directory_page->SetLocalDepth(cur_pages_count, original_local_depth + 1);
   lookup_page_lsb_value_[new_bucket_page_id] = (1 << (original_local_depth)) | lookup_page_lsb_value_[old_page_id];
 
   cur_pages_count++;
@@ -251,6 +265,8 @@ void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const Val
       LOG_INFO("Macth bucket %d not equal to 1, instead %d", i, match);
     }
   }
+
+  PrintDirectory("end of create page");
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -281,7 +297,7 @@ std::unordered_map<page_id_t, uint32_t> HASH_TABLE_TYPE::GetPageToLocalDepth() {
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  table_latch_.WLock();
+  // table_latch_.WLock();
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   uint32_t bucket_index = KeyToDirectoryIndex(key, directory_page);
 
@@ -292,7 +308,7 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   }
 
   Merge(transaction, key, value);
-  table_latch_.WUnlock();
+  // table_latch_.WUnlock();
   return res;
 }
 
@@ -305,16 +321,56 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-void HASH_TABLE_TYPE::PrintDirectory() {
+void HASH_TABLE_TYPE::PrintDirectory(std::string msg) {
+  return;
   // table_latch_.RLock();
+  std::cout << msg << std::endl;
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   LOG_DEBUG("======== DIRECTORY (global_depth_: %u) ========", GetGlobalDepth());
-  LOG_DEBUG("| bucket_idx | page_id | local_depth |");
+  LOG_DEBUG("| bucket_idx | page_id | local_depth | num_elements |");
   for (uint32_t idx = 0; idx < static_cast<uint32_t>(0x1 << GetGlobalDepth()); idx++) {
-    LOG_DEBUG("|      %u     |     %u     |     %u     |     %u     |", idx, dir_page->GetBucketPageId(idx),
-              dir_page->GetLocalDepth(idx), FetchBucketPage(dir_page->GetBucketPageId(idx))->NumReadable());
+    page_id_t page_id = dir_page->GetBucketPageId(idx);
+    uint32_t local_depth = dir_page->GetLocalDepth(idx);
+    uint32_t num_read = FetchBucketPage(page_id)->NumReadable();
+
+    LOG_DEBUG("|      %u     |     %u     |     %u     |     %u     |", idx, page_id, local_depth, num_read);
   }
   LOG_DEBUG("================ END DIRECTORY ================\n");
+
+  for (const auto& [page_id, lsb] : lookup_page_lsb_value_) {
+    std::cout << "Page id" << page_id << " lsb is " << lsb << "\n";
+
+  }
+
+  LOG_DEBUG("================ For Page Begin ================\n");
+
+  std::unordered_map<uint32_t, uint32_t> map;
+  for (int i = 0; i < DIRECTORY_ARRAY_SIZE; i++) {
+    uint32_t page_id = dir_page->GetBucketPageId(i);
+    if (dir_page->GetBucketPageId(i) == 0) {
+      break;
+    }
+
+    if (map.count(page_id) == 0) {
+      map[page_id] = 1;
+      HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
+      std::cout << "\n checking page " << page_id << " size is " << bucket_page->NumReadable()  << std::endl;
+      std::vector<std::pair<KeyType, ValueType>> res = bucket_page->GetAllElements();
+      int count = 0;
+      for (const auto &[key, val] : res) {
+        std::cout << " key " << key << " val " << val;
+        count++;
+
+        if (count == 10) {
+          count = 0;
+          std::cout << "\n";
+        }
+      }
+    }
+  }
+
+  LOG_DEBUG("\n================ For Page End ================\n");
+
   // table_latch_.RUnlock();
 }
 
@@ -323,11 +379,11 @@ void HASH_TABLE_TYPE::PrintDirectory() {
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 uint32_t HASH_TABLE_TYPE::GetGlobalDepth() {
-  table_latch_.RLock();
+  // table_latch_.RLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   uint32_t global_depth = dir_page->GetGlobalDepth();
   assert(buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr));
-  table_latch_.RUnlock();
+  // table_latch_.RUnlock();
   return global_depth;
 }
 
@@ -336,11 +392,11 @@ uint32_t HASH_TABLE_TYPE::GetGlobalDepth() {
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::VerifyIntegrity() {
-  table_latch_.RLock();
+  // table_latch_.RLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   dir_page->VerifyIntegrity();
   assert(buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr));
-  table_latch_.RUnlock();
+  // table_latch_.RUnlock();
 }
 
 /*****************************************************************************

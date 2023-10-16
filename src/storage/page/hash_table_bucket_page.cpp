@@ -41,9 +41,6 @@ bool HASH_TABLE_BUCKET_TYPE::KeyAndValueExistInArray(KeyType key_type, ValueType
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
     if (IsReadable(i)) {
       if ((cmp(KeyAt(i), key_type) == 0) && ValueAt(i) == value_type) {
-        std::cout << "key " << key_type << std::endl;
-        std::cout << "char " << i  <<  (int)readable_[i] << std::endl;
-        std::cout << "Found " << i << " " << ValueAt(i) << " " <<" \n";
         return true;
       }
     }
@@ -68,8 +65,6 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
-  std::cout << "IsFull()" << IsFull() << std::endl;
-  std::cout << KeyAndValueExistInArray(key, value, cmp) << std::endl;
   if (IsFull() || KeyAndValueExistInArray(key, value, cmp)) {
     LOG_WARN("Cannot insert element since it is full or already exist");
     return false;
@@ -95,8 +90,8 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator cmp) {
   // Not found.
-  std::cout << "IsEmpty() " << IsEmpty();
-  std::cout << KeyExistInArray(key, cmp) << std::endl;
+  // std::cout << "IsEmpty() " << IsEmpty();
+  // std::cout << KeyExistInArray(key, cmp) << std::endl;
   if (IsEmpty() || !KeyExistInArray(key, cmp)) {
     return false;
   }
@@ -179,11 +174,10 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 uint32_t HASH_TABLE_BUCKET_TYPE::NumReadable() {
   uint32_t res = 0;
   for (unsigned long i = 0; i < OCCUPIED_ARRAY_SIZE; i++) {
-    int cur_char = readable_[i];
-    while (cur_char != 0) {
-      if ((cur_char & 1) != 0) {
+    char cur_char = readable_[i];
+    for (int i = 0; i < 8; i++){
+      if ((cur_char & (1 << i)) != 0){
         res++;
-        cur_char >>= 1;
       }
     }
   }

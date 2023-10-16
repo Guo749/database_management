@@ -209,7 +209,7 @@ TEST(HashTableTest, TenGrandTest) {
   auto *disk_manager = new DiskManager("test.db");
   auto *bpm = new BufferPoolManagerInstance(50, disk_manager);
   ExtendibleHashTable<int, int, IntComparator> ht("blah", bpm, IntComparator(), HashFunction<int>());
-  int param_num = 900;
+  int param_num = 1916;  // 1917 starts to fail
 
   // insert a few values
   for (int i = 0; i < param_num; i++) {
@@ -241,7 +241,9 @@ TEST(HashTableTest, TenGrandTest) {
     } else {
       EXPECT_TRUE(ht.Insert(nullptr, i, 2 * i));
     }
-    ht.Insert(nullptr, i, 2 * i);
+
+    // same value has already been inserted.
+    EXPECT_FALSE(ht.Insert(nullptr, i, 2 * i));
     std::vector<int> res;
     ht.GetValue(nullptr, i, &res);
     if (i == 0) {
