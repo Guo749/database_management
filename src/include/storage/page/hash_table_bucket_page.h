@@ -139,6 +139,8 @@ class HashTableBucketPage {
 
   std::vector<std::pair<KeyType, ValueType>> GetAllElements();
 
+  void RemoveAllElements();
+
  private:
   bool KeyExistInArray(KeyType key_type, KeyComparator cmp);
   bool KeyAndValueExistInArray(KeyType key_type, ValueType value_type, KeyComparator cmp);

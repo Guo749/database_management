@@ -88,11 +88,12 @@ TEST(HashTablePageTest, BucketPageSampleTest) {
   // check for the flags
   for (unsigned i = 0; i < 15; i++) {
     if (i < 10) {
-      EXPECT_TRUE(bucket_page->IsOccupied(i));
       if (i % 2 == 1) {
         EXPECT_FALSE(bucket_page->IsReadable(i));
+        EXPECT_FALSE(bucket_page->IsOccupied(i));
       } else {
         EXPECT_TRUE(bucket_page->IsReadable(i));
+        EXPECT_TRUE(bucket_page->IsOccupied(i));
       }
     } else {
       EXPECT_FALSE(bucket_page->IsOccupied(i));
@@ -105,6 +106,50 @@ TEST(HashTablePageTest, BucketPageSampleTest) {
       assert(!bucket_page->Remove(i, i, IntComparator()));
     }
   }
+
+  // unpin the directory page now that we are done
+  bpm->UnpinPage(bucket_page_id, true, nullptr);
+  disk_manager->ShutDown();
+  remove("test.db");
+  delete disk_manager;
+  delete bpm;
+}
+
+// NOLINTNEXTLINE
+TEST(HashTablePageTest, BucketPageFullTest) {
+  DiskManager *disk_manager = new DiskManager("test.db");
+  auto *bpm = new BufferPoolManagerInstance(5, disk_manager);
+
+  // get a bucket page from the BufferPoolManager
+  page_id_t bucket_page_id = INVALID_PAGE_ID;
+
+  auto bucket_page = reinterpret_cast<HashTableBucketPage<int, int, IntComparator> *>(
+      bpm->NewPage(&bucket_page_id, nullptr)->GetData());
+
+  assert(bucket_page->IsEmpty());
+  // insert a few (key, value) pairs
+  for (unsigned i = 0; i < 496; i++) {
+    assert(bucket_page->Insert(i, i, IntComparator()));
+  }
+
+  // check for the inserted pairs
+  for (unsigned i = 0; i < 496; i++) {
+    EXPECT_EQ(i, bucket_page->KeyAt(i));
+    EXPECT_EQ(i, bucket_page->ValueAt(i));
+  }
+
+  assert(bucket_page->IsFull());
+  // Cannot insert 496 page
+  for (unsigned i = 496; i < 496 * 2; i++) {
+    EXPECT_EQ(false, bucket_page->Insert(i, i, IntComparator()));
+  }
+
+  // Remove what we inserted
+  for (unsigned i = 0; i < 496; i++) {
+    assert(bucket_page->Remove(i, i, IntComparator()));
+  }
+
+  EXPECT_TRUE(bucket_page->IsEmpty());
 
   // unpin the directory page now that we are done
   bpm->UnpinPage(bucket_page_id, true, nullptr);

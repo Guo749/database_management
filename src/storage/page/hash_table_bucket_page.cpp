@@ -41,6 +41,9 @@ bool HASH_TABLE_BUCKET_TYPE::KeyAndValueExistInArray(KeyType key_type, ValueType
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
     if (IsReadable(i)) {
       if ((cmp(KeyAt(i), key_type) == 0) && ValueAt(i) == value_type) {
+        std::cout << "key " << key_type << std::endl;
+        std::cout << "char " << i  <<  (int)readable_[i] << std::endl;
+        std::cout << "Found " << i << " " << ValueAt(i) << " " <<" \n";
         return true;
       }
     }
@@ -52,7 +55,6 @@ bool HASH_TABLE_BUCKET_TYPE::KeyAndValueExistInArray(KeyType key_type, ValueType
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vector<ValueType> *result) {
   bool found_res = false;
-  PrintBucket();
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
     if (IsReadable(i)) {
       if (cmp(KeyAt(i), key) == 0) {
@@ -66,6 +68,8 @@ bool HASH_TABLE_BUCKET_TYPE::GetValue(KeyType key, KeyComparator cmp, std::vecto
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator cmp) {
+  std::cout << "IsFull()" << IsFull() << std::endl;
+  std::cout << KeyAndValueExistInArray(key, value, cmp) << std::endl;
   if (IsFull() || KeyAndValueExistInArray(key, value, cmp)) {
     LOG_WARN("Cannot insert element since it is full or already exist");
     return false;
@@ -80,7 +84,6 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 
       SetOccupied(i);
       SetReadable(i);
-      PrintBucket();
       return true;
     }
   }
@@ -91,8 +94,9 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator cmp) {
-  PrintBucket();
   // Not found.
+  std::cout << "IsEmpty() " << IsEmpty();
+  std::cout << KeyExistInArray(key, cmp) << std::endl;
   if (IsEmpty() || !KeyExistInArray(key, cmp)) {
     return false;
   }
@@ -105,6 +109,7 @@ bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator 
         // ~ = 0111
         char mask = ~(1 << (i % kCharBit));
         readable_[i / kCharBit] &= mask;
+        occupied_[i / kCharBit] &= mask;
         return true;
       }
     }
@@ -135,7 +140,7 @@ ValueType HASH_TABLE_BUCKET_TYPE::ValueAt(uint32_t bucket_idx) const {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_BUCKET_TYPE::RemoveAt(uint32_t bucket_idx) {
   if (IsOccupied(bucket_idx)) {
-    occupied_[bucket_idx / kCharBit] &= (1 << (bucket_idx % kCharBit));
+    readable_[bucket_idx / kCharBit] &= (1 << (bucket_idx % kCharBit));
   }
 }
 
@@ -162,7 +167,7 @@ void HASH_TABLE_BUCKET_TYPE::SetReadable(uint32_t bucket_idx) {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsFull() {
   for (unsigned long i = 0; i < OCCUPIED_ARRAY_SIZE; i++) {
-    if (occupied_[i] != 0xFF) {
+    if ((occupied_[i] & 0xFF) != 0xFF) {
       return false;
     }
   }
@@ -209,6 +214,18 @@ std::vector<std::pair<KeyType, ValueType>> HASH_TABLE_BUCKET_TYPE::GetAllElement
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_BUCKET_TYPE::RemoveAllElements() {
+  for (uint32_t i = 0; i < BUCKET_ARRAY_SIZE; i++) {
+    occupied_[i] = 0;
+    readable_[i] = 0;
+  }
+
+  if (!IsEmpty()) {
+    LOG_ERROR("Remove all elements while IsEmpty() flag does not indicate this.");
+  }
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_BUCKET_TYPE::PrintBucket() {
   uint32_t size = 0;
   uint32_t taken = 0;
@@ -227,7 +244,7 @@ void HASH_TABLE_BUCKET_TYPE::PrintBucket() {
     }
   }
 
-  LOG_INFO("Bucket Capacity: %lu, Size: %u, Taken: %u, Free: %u", BUCKET_ARRAY_SIZE, size, taken, free);
+  LOG_INFO("Bucket Capacity: %lu, Size: %u, Taken: %u, Free: %u\n", BUCKET_ARRAY_SIZE, size, taken, free);
 }
 
 // DO NOT REMOVE ANYTHING BELOW THIS LINE

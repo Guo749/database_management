@@ -50,6 +50,10 @@ bool HashTableDirectoryPage::CanShrink() { return false; }
 
 uint32_t HashTableDirectoryPage::GetLocalDepth(uint32_t bucket_idx) { return local_depths_[bucket_idx]; }
 
+uint32_t HashTableDirectoryPage::GetLocalDepthMask(uint32_t bucket_idx) {
+  return pow(2, GetLocalDepth(bucket_idx)) - 1;
+}
+
 void HashTableDirectoryPage::SetLocalDepth(uint32_t bucket_idx, uint8_t local_depth) {
   local_depths_[bucket_idx] = local_depth;
 }
@@ -107,7 +111,7 @@ void HashTableDirectoryPage::VerifyIntegrity() {
     uint32_t required_count = 0x1 << (global_depth_ - curr_ld);
 
     if (curr_count != required_count) {
-      LOG_WARN("Verify Integrity: curr_count: %u, required_count %u, for page_id: %u", curr_ld, required_count,
+      LOG_WARN("Verify Integrity: curr_count: %u, required_count %u, for page_id: %u", curr_count, required_count,
                curr_page_id);
       PrintDirectory();
 
@@ -124,7 +128,7 @@ void HashTableDirectoryPage::PrintDirectory() {
   for (uint32_t idx = 0; idx < static_cast<uint32_t>(0x1 << global_depth_); idx++) {
     LOG_DEBUG("|      %u     |     %u     |     %u     |", idx, bucket_page_ids_[idx], local_depths_[idx]);
   }
-  LOG_DEBUG("================ END DIRECTORY ================");
+  LOG_DEBUG("================ END DIRECTORY ================\n");
 }
 
 }  // namespace bustub

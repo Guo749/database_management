@@ -13,6 +13,7 @@
 #include <deque>
 #include <iostream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -22,6 +23,11 @@
 #include "container/hash/extendible_hash_table.h"
 
 namespace bustub {
+namespace {
+uint32_t MaskByLocalDepth(uint32_t candidate, uint32_t local_depth) {
+  return ((1 << local_depth) - 1) & candidate;
+}
+}  // namespace
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HASH_TABLE_TYPE::ExtendibleHashTable(const std::string &name, BufferPoolManager *buffer_pool_manager,
@@ -68,8 +74,7 @@ inline uint32_t HASH_TABLE_TYPE::KeyToPageId(KeyType key, HashTableDirectoryPage
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HashTableDirectoryPage *HASH_TABLE_TYPE::FetchDirectoryPage() {
-  return reinterpret_cast<HashTableDirectoryPage *>(
-      buffer_pool_manager_->FetchPage(directory_page_id_)->GetData());
+  return reinterpret_cast<HashTableDirectoryPage *>(buffer_pool_manager_->FetchPage(directory_page_id_)->GetData());
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -86,7 +91,7 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   directory_page->PrintDirectory();
   uint32_t bucket_index = KeyToDirectoryIndex(key, directory_page);
-  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_index);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(directory_page->GetBucketPageId(bucket_index));
 
   bool res = bucket_page->GetValue(key, comparator_, result);
 
@@ -101,7 +106,8 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
   table_latch_.WLock();
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
-
+  LOG_INFO("Begin writing.... \n");
+  std::cout << "Inserting " << key << " -> " << value << std::endl;
   // Initial call
   if (directory_page->GetGlobalDepth() == 0) {
     bool insert_result = SplitInsert(transaction, key, value);
@@ -111,8 +117,10 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
   uint32_t bucket_index = KeyToDirectoryIndex(key, directory_page);
 
-  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_index);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(directory_page->GetBucketPageId(bucket_index));
+
   if (bucket_page->IsFull()) {
+    std::cout << "Current bucket index " << bucket_index << " is full, need split " << std::endl;
     bool insert_result = SplitInsert(transaction, key, value);
     table_latch_.WUnlock();
     return insert_result;
@@ -120,6 +128,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
   bool insert_result = bucket_page->Insert(key, value, comparator_);
   table_latch_.WUnlock();
+  LOG_INFO("End Writing...\n");
   return insert_result;
 }
 
@@ -137,6 +146,7 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
         reinterpret_cast<HASH_TABLE_BUCKET_TYPE *>(buffer_pool_manager_->FetchPage(old_page_id)->GetData());
 
     pairs_to_add = bucket_page->GetAllElements();
+    bucket_page->RemoveAllElements();
   }
 
   pairs_to_add.push_back({key, value});
@@ -145,11 +155,12 @@ bool HASH_TABLE_TYPE::SplitInsert(Transaction *transaction, const KeyType &key, 
   for (const auto &the_pair : pairs_to_add) {
     std::cout << the_pair.first << " hello wenchao " << the_pair.second << "\n";
     uint32_t bucket_index = KeyToDirectoryIndex(the_pair.first, FetchDirectoryPage());
-    HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_index);
+    HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(FetchDirectoryPage()->GetBucketPageId(bucket_index));
     // All bucket pages should have enough place to add.
-    bool res = bucket_page->Insert(key, value, comparator_);
+    bool res = bucket_page->Insert(the_pair.first, the_pair.second, comparator_);
     if (!res) {
-      LOG_WARN("Cannot insert the element after split");
+      LOG_ERROR("Cannot insert the element after split");
+      std::cout << "key is " << the_pair.first << " " << the_pair.second << std::endl;
       return false;
     }
   }
@@ -181,31 +192,88 @@ void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const Val
       cur_pages_count++;
     }
 
-  } else {  // create one new page is enough
-    page_id_t new_bucket_page_id;
-    Page *new_bucket_page = buffer_pool_manager_->NewPage(&new_bucket_page_id);
-    if (new_bucket_page == nullptr) {
-      LOG_ERROR("When split insert, cannot allocate new page");
-      return;
+    return;
+  }
+
+  // create one new page is enough
+  page_id_t new_bucket_page_id;
+  Page *new_bucket_page = buffer_pool_manager_->NewPage(&new_bucket_page_id);
+  if (new_bucket_page == nullptr) {
+    LOG_ERROR("When split insert, cannot allocate new page");
+    return;
+  }else {
+    LOG_INFO("Create a new page");
+    std::cout << key << std::endl;
+  }
+
+  // for old page, lsb stay the same
+  // for new page, lsb add 1 at the beginning.
+  // update old pages
+  uint32_t old_bucket_index = KeyToDirectoryIndex(key, directory_page);
+  page_id_t old_page_id = directory_page->GetBucketPageId(old_bucket_index);
+  *old_full_page_id = old_page_id;
+
+  uint32_t original_local_depth = directory_page->GetLocalDepth(old_bucket_index);
+  std::cout << "old bucket index" << old_bucket_index << " ld" << original_local_depth << "?\n";
+  directory_page->SetLocalDepth(old_bucket_index, original_local_depth + 1);
+
+  // update new pages
+  directory_page->SetBucketPageId(cur_pages_count, new_bucket_page_id);
+  directory_page->SetLocalDepth(cur_pages_count, directory_page->GetLocalDepth(old_bucket_index));
+  lookup_page_lsb_value_[new_bucket_page_id] = (1 << (original_local_depth)) | lookup_page_lsb_value_[old_page_id];
+
+  cur_pages_count++;
+
+  // Update all bucket pointers
+  std::unordered_map<page_id_t, uint32_t> page_to_local_depth = GetPageToLocalDepth();
+  for (const auto &[page_id, local_depth] : page_to_local_depth) {
+    std::cout << "page_to_local_depth table is page id" << page_id << " local depth" << local_depth << std::endl;
+  }
+  for (const auto &[page_id, lsb_value] : lookup_page_lsb_value_) {
+    std::cout << "Lookup table page_id " << page_id << "- lsb_value" << lsb_value << std::endl;
+  }
+
+  for (uint32_t i = 0; i < directory_page->Size(); i++) {
+    int match = 0;
+
+    for (const auto &[page_id, lsb_value] : lookup_page_lsb_value_) {
+      uint32_t lsb_equal = MaskByLocalDepth(i, page_to_local_depth[page_id]) ^ lsb_value;
+      if (lsb_equal == 0) {
+        directory_page->SetBucketPageId(i, page_id);
+
+        assert(page_to_local_depth.count(page_id) != 0);
+        directory_page->SetLocalDepth(i, page_to_local_depth[page_id]);
+        match++;
+      }
     }
 
-    // for old page, lsb stay the same
-    // for new page, lsb add 1 at the beginning.
-    // update old pages
-    uint32_t old_bucket_index = KeyToDirectoryIndex(key, directory_page);
-    page_id_t old_page_id = directory_page->GetBucketPageId(old_bucket_index);
-    *old_full_page_id = old_page_id;
-
-    uint8_t original_local_depth = directory_page->GetLocalDepth(old_bucket_index);
-    directory_page->SetLocalDepth(old_bucket_index, original_local_depth + 1);
-
-    // update new pages
-    directory_page->SetBucketPageId(cur_pages_count, new_bucket_page_id);
-    directory_page->SetLocalDepth(cur_pages_count, directory_page->GetLocalDepth(old_bucket_index));
-    lookup_page_lsb_value_[new_bucket_page_id] = (1 << original_local_depth) | lookup_page_lsb_value_[old_page_id];
-
-    cur_pages_count++;
+    if (match != 1) {
+      LOG_INFO("Macth bucket %d not equal to 1, instead %d", i, match);
+    }
   }
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
+std::unordered_map<page_id_t, uint32_t> HASH_TABLE_TYPE::GetPageToLocalDepth() {
+  HashTableDirectoryPage *directory_page = FetchDirectoryPage();
+  std::unordered_map<page_id_t, uint32_t> res;
+  for (uint32_t i = 0; i < directory_page->Size(); i++) {
+    page_id_t page_id = directory_page->GetBucketPageId(i);
+    if (page_id == 0) {
+      LOG_INFO("starting from Page id %d, page id is zero", i);
+      break;
+    }
+
+    uint32_t local_depth = directory_page->GetLocalDepth(i);
+    if (local_depth == 0) {
+      LOG_INFO("starting from %d, local depth is 0", i);
+      break;
+    }
+
+    res.insert({page_id, local_depth});
+  }
+
+  return res;
 }
 
 /*****************************************************************************
@@ -217,7 +285,7 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   uint32_t bucket_index = KeyToDirectoryIndex(key, directory_page);
 
-  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(bucket_index);
+  HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(directory_page->GetBucketPageId(bucket_index));
   bool res = bucket_page->Remove(key, value, comparator_);
   if (!res) {
     LOG_WARN("Remove element that does not exist");
@@ -234,6 +302,20 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const ValueType &value) {
   // TODO(IMPLEMENT THIS)
+}
+
+template <typename KeyType, typename ValueType, typename KeyComparator>
+void HASH_TABLE_TYPE::PrintDirectory() {
+  // table_latch_.RLock();
+  HashTableDirectoryPage *dir_page = FetchDirectoryPage();
+  LOG_DEBUG("======== DIRECTORY (global_depth_: %u) ========", GetGlobalDepth());
+  LOG_DEBUG("| bucket_idx | page_id | local_depth |");
+  for (uint32_t idx = 0; idx < static_cast<uint32_t>(0x1 << GetGlobalDepth()); idx++) {
+    LOG_DEBUG("|      %u     |     %u     |     %u     |     %u     |", idx, dir_page->GetBucketPageId(idx),
+              dir_page->GetLocalDepth(idx), FetchBucketPage(dir_page->GetBucketPageId(idx))->NumReadable());
+  }
+  LOG_DEBUG("================ END DIRECTORY ================\n");
+  // table_latch_.RUnlock();
 }
 
 /*****************************************************************************
