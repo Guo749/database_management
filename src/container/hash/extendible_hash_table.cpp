@@ -85,7 +85,7 @@ HASH_TABLE_BUCKET_TYPE *HASH_TABLE_TYPE::FetchBucketPage(page_id_t bucket_page_i
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) {
-  // table_latch_.RLock();
+  table_latch_.RLock();
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   uint32_t bucket_index = KeyToDirectoryIndex(key, directory_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(directory_page->GetBucketPageId(bucket_index));
@@ -93,7 +93,7 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   bool res = bucket_page->GetValue(key, comparator_, result);
   PrintDirectory("In GetValue");
 
-  // table_latch_.RUnlock();
+  table_latch_.RUnlock();
   return res;
 }
 
@@ -102,14 +102,14 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  // table_latch_.WLock();
+  table_latch_.WLock();
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   LOG_INFO("Begin writing.... \n");
   std::cout << "Inserting " << key << " -> " << value << std::endl;
   // Initial call
   if (directory_page->GetGlobalDepth() == 0) {
     bool insert_result = SplitInsert(transaction, key, value);
-    // table_latch_.WUnlock();
+    table_latch_.WUnlock();
     return insert_result;
   }
 
@@ -119,20 +119,21 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
   if (bucket_page->KeyAndValueExistInArray(key, value, comparator_)){
     LOG_WARN("Key and value has already exsit");
+    table_latch_.WUnlock();
     return false;
   }
 
   if (bucket_page->IsFull()) {
     std::cout << "Current bucket index " << bucket_index << " is full, need split " << std::endl;
     bool insert_result = SplitInsert(transaction, key, value);
-    // table_latch_.WUnlock();
+    table_latch_.WUnlock();
     return insert_result;
   }
 
 
 
   bool insert_result = bucket_page->Insert(key, value, comparator_);
-  // table_latch_.WUnlock();
+  table_latch_.WUnlock();
   LOG_INFO("End Writing...\n");
   return insert_result;
 }
@@ -177,10 +178,9 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const ValueType &value,
                                                    page_id_t *old_full_page_id) {
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
-  if (GetGlobalDepth() == 0) {
+  if (directory_page->GetGlobalDepth() == 0) {
     directory_page->IncrGlobalDepth();
     *old_full_page_id = -1;
-
     for (int i = 0; i < 2; i++) {
       page_id_t new_bucket_page_id;
       Page *new_bucket_page = buffer_pool_manager_->NewPage(&new_bucket_page_id);
@@ -197,7 +197,6 @@ void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const Val
 
     return;
   }
-
   PrintDirectory("In create page");
   // create one new page is enough
   page_id_t new_bucket_page_id;
@@ -297,7 +296,7 @@ std::unordered_map<page_id_t, uint32_t> HASH_TABLE_TYPE::GetPageToLocalDepth() {
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  // table_latch_.WLock();
+  table_latch_.WLock();
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   uint32_t bucket_index = KeyToDirectoryIndex(key, directory_page);
 
@@ -308,7 +307,7 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
   }
 
   Merge(transaction, key, value);
-  // table_latch_.WUnlock();
+  table_latch_.WUnlock();
   return res;
 }
 
@@ -323,8 +322,8 @@ void HASH_TABLE_TYPE::Merge(Transaction *transaction, const KeyType &key, const 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::PrintDirectory(std::string msg) {
   return;
-  // table_latch_.RLock();
-  LOG_INFO(msg);
+  table_latch_.RLock();
+  std::cout << msg << std::endl;
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   LOG_DEBUG("======== DIRECTORY (global_depth_: %u) ========", GetGlobalDepth());
   LOG_DEBUG("| bucket_idx | page_id | local_depth | num_elements |");
@@ -371,7 +370,7 @@ void HASH_TABLE_TYPE::PrintDirectory(std::string msg) {
 
   LOG_DEBUG("\n================ For Page End ================\n");
 
-  // table_latch_.RUnlock();
+  table_latch_.RUnlock();
 }
 
 /*****************************************************************************
@@ -379,11 +378,11 @@ void HASH_TABLE_TYPE::PrintDirectory(std::string msg) {
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 uint32_t HASH_TABLE_TYPE::GetGlobalDepth() {
-  // table_latch_.RLock();
+  table_latch_.RLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   uint32_t global_depth = dir_page->GetGlobalDepth();
   assert(buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr));
-  // table_latch_.RUnlock();
+  table_latch_.RUnlock();
   return global_depth;
 }
 
@@ -392,11 +391,11 @@ uint32_t HASH_TABLE_TYPE::GetGlobalDepth() {
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::VerifyIntegrity() {
-  // table_latch_.RLock();
+  table_latch_.RLock();
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   dir_page->VerifyIntegrity();
   assert(buffer_pool_manager_->UnpinPage(directory_page_id_, false, nullptr));
-  // table_latch_.RUnlock();
+  table_latch_.RUnlock();
 }
 
 /*****************************************************************************

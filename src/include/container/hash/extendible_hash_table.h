@@ -176,7 +176,7 @@ class ExtendibleHashTable {
   KeyComparator comparator_;
 
   // Readers includes inserts and removes, writers are splits and merges
-  // ReaderWriterLatch table_latch_;
+  ReaderWriterLatch table_latch_;
   HashFunction<KeyType> hash_fn_;
 
   // How many bucket pages we have.
