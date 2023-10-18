@@ -324,7 +324,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::PrintDirectory(std::string msg) {
   return;
   // table_latch_.RLock();
-  std::cout << msg << std::endl;
+  LOG_INFO(msg);
   HashTableDirectoryPage *dir_page = FetchDirectoryPage();
   LOG_DEBUG("======== DIRECTORY (global_depth_: %u) ========", GetGlobalDepth());
   LOG_DEBUG("| bucket_idx | page_id | local_depth | num_elements |");
