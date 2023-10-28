@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <deque>
 #include <vector>
 
 #include "execution/executor_context.h"
@@ -50,5 +51,11 @@ class SeqScanExecutor : public AbstractExecutor {
  private:
   /** The sequential scan plan node to be executed */
   const SeqScanPlanNode *plan_;
+
+  /**
+   * The container includes all tuples from this execution plan.
+   * Note the header is the first element added, while the tail is added later,
+   */
+  std::deque<Tuple> tuples_;
 };
 }  // namespace bustub

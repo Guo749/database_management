@@ -175,8 +175,8 @@ uint32_t HASH_TABLE_BUCKET_TYPE::NumReadable() {
   uint32_t res = 0;
   for (unsigned long i = 0; i < OCCUPIED_ARRAY_SIZE; i++) {
     char cur_char = readable_[i];
-    for (int i = 0; i < 8; i++){
-      if ((cur_char & (1 << i)) != 0){
+    for (int i = 0; i < 8; i++) {
+      if ((cur_char & (1 << i)) != 0) {
         res++;
       }
     }

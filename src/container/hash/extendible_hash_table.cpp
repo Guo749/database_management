@@ -105,7 +105,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   table_latch_.WLock();
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   LOG_INFO("Begin writing.... \n");
-  std::cout << "Inserting " << key << " -> " << value << std::endl;
+  // std::cout << "Inserting " << key << " -> " << value << std::endl;
   // Initial call
   if (directory_page->GetGlobalDepth() == 0) {
     bool insert_result = SplitInsert(transaction, key, value);
@@ -117,7 +117,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(directory_page->GetBucketPageId(bucket_index));
 
-  if (bucket_page->KeyAndValueExistInArray(key, value, comparator_)){
+  if (bucket_page->KeyAndValueExistInArray(key, value, comparator_)) {
     LOG_WARN("Key and value has already exsit");
     table_latch_.WUnlock();
     return false;
@@ -129,8 +129,6 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
     table_latch_.WUnlock();
     return insert_result;
   }
-
-
 
   bool insert_result = bucket_page->Insert(key, value, comparator_);
   table_latch_.WUnlock();
@@ -220,12 +218,12 @@ void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const Val
   uint32_t original_local_depth = directory_page->GetLocalDepth(old_bucket_index);
   for (int i = 0; i < DIRECTORY_ARRAY_SIZE; i++) {
     page_id_t page_id = directory_page->GetBucketPageId(i);
-    if (page_id == 0){
+    if (page_id == 0) {
       LOG_INFO("Page id %d == 0", page_id);
       break;
     }
 
-    if (page_id == old_page_id){
+    if (page_id == old_page_id) {
       directory_page->SetLocalDepth(i, original_local_depth + 1);
     }
   }
@@ -336,9 +334,8 @@ void HASH_TABLE_TYPE::PrintDirectory(std::string msg) {
   }
   LOG_DEBUG("================ END DIRECTORY ================\n");
 
-  for (const auto& [page_id, lsb] : lookup_page_lsb_value_) {
+  for (const auto &[page_id, lsb] : lookup_page_lsb_value_) {
     std::cout << "Page id" << page_id << " lsb is " << lsb << "\n";
-
   }
 
   LOG_DEBUG("================ For Page Begin ================\n");
@@ -353,7 +350,7 @@ void HASH_TABLE_TYPE::PrintDirectory(std::string msg) {
     if (map.count(page_id) == 0) {
       map[page_id] = 1;
       HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(page_id);
-      std::cout << "\n checking page " << page_id << " size is " << bucket_page->NumReadable()  << std::endl;
+      std::cout << "\n checking page " << page_id << " size is " << bucket_page->NumReadable() << std::endl;
       std::vector<std::pair<KeyType, ValueType>> res = bucket_page->GetAllElements();
       int count = 0;
       for (const auto &[key, val] : res) {

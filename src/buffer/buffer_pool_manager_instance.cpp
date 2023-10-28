@@ -64,7 +64,7 @@ bool BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) {
     disk_manager_->WritePage(page_id, page.GetData());
     LOG_INFO("Page %d is dirty, writing it back to disk.", page.GetPageId());
   } else {
-    LOG_INFO("Page %d is not dirty in FlushPgImp, this is a no-op.", page.GetPageId());
+    // LOG_INFO("Page %d is not dirty in FlushPgImp, this is a no-op.", page.GetPageId());
   }
 
   return true;

@@ -87,7 +87,7 @@ using ComparatorType = GenericComparator<8>;
 using HashFunctionType = HashFunction<KeyType>;
 
 // SELECT col_a, col_b FROM test_1 WHERE col_a < 500
-TEST_F(ExecutorTest, DISABLED_SimpleSeqScanTest) {
+TEST_F(ExecutorTest, SimpleSeqScanTest) {
   // Construct query plan
   TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
   const Schema &schema = table_info->schema_;
@@ -110,8 +110,25 @@ TEST_F(ExecutorTest, DISABLED_SimpleSeqScanTest) {
   }
 }
 
+// SELECT col_a FROM empty_table WHERE col_a < 500
+TEST_F(ExecutorTest, SeqScanEmptyTable) {
+  // Construct query plan
+  TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("empty_table");
+  const Schema &schema = table_info->schema_;
+  auto *col_a = MakeColumnValueExpression(schema, 0, "colA");
+  auto *const500 = MakeConstantValueExpression(ValueFactory::GetIntegerValue(500));
+  auto *predicate = MakeComparisonExpression(col_a, const500, ComparisonType::LessThan);
+  auto *out_schema = MakeOutputSchema({{"colA", col_a}});
+  SeqScanPlanNode plan{out_schema, predicate, table_info->oid_};
+
+  // Execute
+  std::vector<Tuple> result_set{};
+  GetExecutionEngine()->Execute(&plan, &result_set, GetTxn(), GetExecutorContext());
+  ASSERT_EQ(result_set.size(), 0);
+}
+
 // INSERT INTO empty_table2 VALUES (100, 10), (101, 11), (102, 12)
-TEST_F(ExecutorTest, DISABLED_SimpleRawInsertTest) {
+TEST_F(ExecutorTest, SimpleRawInsertTest) {
   // Create Values to insert
   std::vector<Value> val1{ValueFactory::GetIntegerValue(100), ValueFactory::GetIntegerValue(10)};
   std::vector<Value> val2{ValueFactory::GetIntegerValue(101), ValueFactory::GetIntegerValue(11)};
@@ -123,7 +140,6 @@ TEST_F(ExecutorTest, DISABLED_SimpleRawInsertTest) {
   InsertPlanNode insert_plan{std::move(raw_vals), table_info->oid_};
 
   GetExecutionEngine()->Execute(&insert_plan, nullptr, GetTxn(), GetExecutorContext());
-
   // Iterate through table make sure that values were inserted.
 
   // SELECT * FROM empty_table2;
@@ -135,7 +151,6 @@ TEST_F(ExecutorTest, DISABLED_SimpleRawInsertTest) {
 
   std::vector<Tuple> result_set{};
   GetExecutionEngine()->Execute(&scan_plan, &result_set, GetTxn(), GetExecutorContext());
-
   // Size
   ASSERT_EQ(result_set.size(), 3);
 
@@ -153,7 +168,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleRawInsertTest) {
 }
 
 // INSERT INTO empty_table2 SELECT col_a, col_b FROM test_1 WHERE col_a < 500
-TEST_F(ExecutorTest, DISABLED_SimpleSelectInsertTest) {
+TEST_F(ExecutorTest, SimpleSelectInsertTest) {
   const Schema *out_schema1;
   std::unique_ptr<AbstractPlanNode> scan_plan1;
   {

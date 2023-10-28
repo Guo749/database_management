@@ -209,7 +209,7 @@ TEST(HashTableTest, TenGrandTest) {
   auto *disk_manager = new DiskManager("test.db");
   auto *bpm = new BufferPoolManagerInstance(50, disk_manager);
   ExtendibleHashTable<int, int, IntComparator> ht("blah", bpm, IntComparator(), HashFunction<int>());
-  int param_num = 1000;  
+  int param_num = 1000;
 
   // insert a few values
   for (int i = 0; i < param_num; i++) {
