@@ -179,9 +179,6 @@ class ExtendibleHashTable {
   ReaderWriterLatch table_latch_;
   HashFunction<KeyType> hash_fn_;
 
-  // How many bucket pages we have.
-  uint32_t cur_pages_count;
-
   // Mapping between page id and lsb value in this bucket page.
   // eg:
   // page id 0, lsb value 00

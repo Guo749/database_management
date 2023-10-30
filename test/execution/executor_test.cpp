@@ -220,7 +220,7 @@ TEST_F(ExecutorTest, SimpleSelectInsertTest) {
 }
 
 // INSERT INTO empty_table2 VALUES (100, 10), (101, 11), (102, 12)
-TEST_F(ExecutorTest, DISABLED_SimpleRawInsertWithIndexTest) {
+TEST_F(ExecutorTest, SimpleRawInsertWithIndexTest) {
   // Create Values to insert
   std::vector<Value> val1{ValueFactory::GetIntegerValue(100), ValueFactory::GetIntegerValue(10)};
   std::vector<Value> val2{ValueFactory::GetIntegerValue(101), ValueFactory::GetIntegerValue(11)};
@@ -234,7 +234,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleRawInsertWithIndexTest) {
   auto key_schema = ParseCreateStatement("a bigint");
   ComparatorType comparator{key_schema.get()};
   auto *index_info = GetExecutorContext()->GetCatalog()->CreateIndex<KeyType, ValueType, ComparatorType>(
-      GetTxn(), "index1", "empty_table2", table_info->schema_, *key_schema, {0}, 8, HashFunctionType{});
+      GetTxn(), "index1", "empty_table2", table_info->schema_, *key_schema, {0}, 8, HashFunctionType{}, false);
 
   // Execute the insert
   GetExecutionEngine()->Execute(&insert_plan, nullptr, GetTxn(), GetExecutorContext());
@@ -285,7 +285,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleRawInsertWithIndexTest) {
 }
 
 // UPDATE test_3 SET colB = colB + 1;
-TEST_F(ExecutorTest, DISABLED_SimpleUpdateTest) {
+TEST_F(ExecutorTest, SimpleUpdateTest) {
   // Construct a sequential scan of the table
   const Schema *out_schema{};
   std::unique_ptr<AbstractPlanNode> scan_plan{};
@@ -343,8 +343,23 @@ TEST_F(ExecutorTest, DISABLED_SimpleUpdateTest) {
   }
 }
 
+// TEST_F(ExecutorTest, CheckTableContent) {
+//   TableInfo* table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
+//   const Schema schema = table_info->schema_;
+//   for (Column column : schema.GetColumns()){
+//     std::cout << column.ToString() << std::endl;
+//   }
+
+//   TableIterator ti_begin = table_info->table_->Begin(GetExecutorContext()->GetTransaction());
+//   TableIterator ti_end = table_info->table_->End();
+
+//   for (auto it = ti_begin; it != ti_end; it++){
+//     std::cout << (*it).ToString(&schema) << "\n";
+//   }
+// }
+
 // DELETE FROM test_1 WHERE col_a == 50;
-TEST_F(ExecutorTest, DISABLED_SimpleDeleteTest) {
+TEST_F(ExecutorTest, SimpleDeleteTest) {
   // Construct query plan
   auto table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
   auto &schema = table_info->schema_;
@@ -357,9 +372,10 @@ TEST_F(ExecutorTest, DISABLED_SimpleDeleteTest) {
   // Create the index
   auto key_schema = ParseCreateStatement("a bigint");
   ComparatorType comparator{key_schema.get()};
-  auto *index_info = GetExecutorContext()->GetCatalog()->CreateIndex<KeyType, ValueType, ComparatorType>(
-      GetTxn(), "index1", "test_1", GetExecutorContext()->GetCatalog()->GetTable("test_1")->schema_, *key_schema, {0},
-      8, HashFunctionType{});
+  [[maybe_unused]] auto *index_info =
+      GetExecutorContext()->GetCatalog()->CreateIndex<KeyType, ValueType, ComparatorType>(
+          GetTxn(), "index1", "test_1", GetExecutorContext()->GetCatalog()->GetTable("test_1")->schema_, *key_schema,
+          {0}, 8, HashFunctionType{}, true);
 
   std::vector<Tuple> result_set;
   GetExecutionEngine()->Execute(scan_plan1.get(), &result_set, GetTxn(), GetExecutorContext());
@@ -374,18 +390,20 @@ TEST_F(ExecutorTest, DISABLED_SimpleDeleteTest) {
   const Tuple index_key = Tuple(result_set[0]);
   std::unique_ptr<AbstractPlanNode> delete_plan;
   { delete_plan = std::make_unique<DeletePlanNode>(scan_plan1.get(), table_info->oid_); }
+  std::cout << "tuple resulst" << index_key.ToString(&schema) << "|\n";
   GetExecutionEngine()->Execute(delete_plan.get(), nullptr, GetTxn(), GetExecutorContext());
-
+  LOG_INFO("hello");
   result_set.clear();
-
   // SELECT col_a FROM test_1 WHERE col_a == 50
   GetExecutionEngine()->Execute(scan_plan1.get(), &result_set, GetTxn(), GetExecutorContext());
-  ASSERT_TRUE(result_set.empty());
+  EXPECT_TRUE(result_set.empty());
 
   // Ensure the key was removed from the index
   std::vector<RID> rids{};
+
   index_info->index_->ScanKey(index_key, &rids, GetTxn());
-  ASSERT_TRUE(rids.empty());
+  std::cout << "rids size" << rids.size() << "\n";
+  EXPECT_TRUE(rids.empty());
 }
 
 // SELECT test_1.col_a, test_1.col_b, test_2.col1, test_2.col3 FROM test_1 JOIN test_2 ON test_1.col_a = test_2.col1;

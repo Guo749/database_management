@@ -27,8 +27,8 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_INDEX_TYPE::DeleteEntry(const Tuple &key, RID rid, Transaction *transaction) {
   // construct delete index key
   KeyType index_key;
-  index_key.SetFromKey(key);
 
+  index_key.SetFromKey(key);
   container_.Remove(transaction, index_key, rid);
 }
 

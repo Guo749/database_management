@@ -72,8 +72,8 @@ bool HASH_TABLE_BUCKET_TYPE::Insert(KeyType key, ValueType value, KeyComparator 
 
   // Find one empty slot
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
-    if (!IsOccupied(i)) {
-      LOG_INFO("Inserting element into %zu", i);
+    if (!IsReadable(i)) {
+      std::cout << "Inserting " << key << " AND " << value << "Into " << i << std::endl;
       array_[i].first = key;
       array_[i].second = value;
 
@@ -97,14 +97,13 @@ bool HASH_TABLE_BUCKET_TYPE::Remove(KeyType key, ValueType value, KeyComparator 
   }
 
   for (unsigned long i = 0; i < BUCKET_ARRAY_SIZE; i++) {
-    if (IsOccupied(i) && IsReadable(i)) {
+    if (IsReadable(i)) {
       if (cmp(key, KeyAt(i)) == 0) {
         // if i = 3,
         // 1 << (i % kCharBit) = 1000
         // ~ = 0111
         char mask = ~(1 << (i % kCharBit));
         readable_[i / kCharBit] &= mask;
-        occupied_[i / kCharBit] &= mask;
         return true;
       }
     }
@@ -134,14 +133,14 @@ ValueType HASH_TABLE_BUCKET_TYPE::ValueAt(uint32_t bucket_idx) const {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_BUCKET_TYPE::RemoveAt(uint32_t bucket_idx) {
-  if (IsOccupied(bucket_idx)) {
+  if (IsReadable(bucket_idx)) {
     readable_[bucket_idx / kCharBit] &= (1 << (bucket_idx % kCharBit));
   }
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsOccupied(uint32_t bucket_idx) const {
-  return ((occupied_[bucket_idx / kCharBit]) >> (bucket_idx % kCharBit)) & 0x01;
+  return ((occupied_[bucket_idx / kCharBit]) >> (bucket_idx % kCharBit)) & 0b1;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -151,7 +150,7 @@ void HASH_TABLE_BUCKET_TYPE::SetOccupied(uint32_t bucket_idx) {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsReadable(uint32_t bucket_idx) const {
-  return ((readable_[bucket_idx / kCharBit]) >> (bucket_idx % kCharBit)) & 0x01;
+  return ((readable_[bucket_idx / kCharBit]) >> (bucket_idx % kCharBit)) & 0b1;
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -161,13 +160,21 @@ void HASH_TABLE_BUCKET_TYPE::SetReadable(uint32_t bucket_idx) {
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsFull() {
-  for (unsigned long i = 0; i < OCCUPIED_ARRAY_SIZE; i++) {
-    if ((occupied_[i] & 0xFF) != 0xFF) {
+  for (unsigned long i = 0; i < OCCUPIED_ARRAY_SIZE - 1; i++) {
+    if (((int)readable_[i]) != -1) {
       return false;
     }
   }
 
-  return true;
+  // For last bit, we check it specially since the array may not fully represnet the situation
+  // Like we have 252 bits and (252 -1) / 8 + 1 == 32 (bytes)
+  // 32 * 8 = 256, which has some bits that have no meaning, we cannot check full for these bigs
+  char expected_full_char = 0;
+  for (unsigned long i = (OCCUPIED_ARRAY_SIZE - 1) * 8; i < BUCKET_ARRAY_SIZE; i++) {
+    expected_full_char |= (1 << (i % kCharBit));
+  }
+
+  return expected_full_char == readable_[OCCUPIED_ARRAY_SIZE - 1];
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
@@ -188,7 +195,7 @@ uint32_t HASH_TABLE_BUCKET_TYPE::NumReadable() {
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BUCKET_TYPE::IsEmpty() {
   for (unsigned long i = 0; i < OCCUPIED_ARRAY_SIZE; i++) {
-    if (occupied_[i] != 0X00) {
+    if (readable_[i] != 0X00) {
       return false;
     }
   }
@@ -220,7 +227,7 @@ void HASH_TABLE_BUCKET_TYPE::RemoveAllElements() {
 }
 
 template <typename KeyType, typename ValueType, typename KeyComparator>
-void HASH_TABLE_BUCKET_TYPE::PrintBucket() {
+void HASH_TABLE_BUCKET_TYPE::PrintBucket() const {
   uint32_t size = 0;
   uint32_t taken = 0;
   uint32_t free = 0;

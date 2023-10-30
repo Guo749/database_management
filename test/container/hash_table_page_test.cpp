@@ -74,8 +74,8 @@ TEST(HashTablePageTest, BucketPageSampleTest) {
 
   // check for the inserted pairs
   for (unsigned i = 0; i < 10; i++) {
-    EXPECT_EQ(i, bucket_page->KeyAt(i));
-    EXPECT_EQ(i, bucket_page->ValueAt(i));
+    ASSERT_EQ(i, bucket_page->KeyAt(i));
+    ASSERT_EQ(i, bucket_page->ValueAt(i));
   }
 
   // remove a few pairs
@@ -88,15 +88,14 @@ TEST(HashTablePageTest, BucketPageSampleTest) {
   // check for the flags
   for (unsigned i = 0; i < 15; i++) {
     if (i < 10) {
+      ASSERT_TRUE(bucket_page->IsOccupied(i));
       if (i % 2 == 1) {
-        EXPECT_FALSE(bucket_page->IsReadable(i));
-        EXPECT_FALSE(bucket_page->IsOccupied(i));
+        ASSERT_FALSE(bucket_page->IsReadable(i));
       } else {
-        EXPECT_TRUE(bucket_page->IsReadable(i));
-        EXPECT_TRUE(bucket_page->IsOccupied(i));
+        ASSERT_TRUE(bucket_page->IsReadable(i));
       }
     } else {
-      EXPECT_FALSE(bucket_page->IsOccupied(i));
+      ASSERT_FALSE(bucket_page->IsOccupied(i));
     }
   }
 
@@ -134,22 +133,22 @@ TEST(HashTablePageTest, BucketPageFullTest) {
 
   // check for the inserted pairs
   for (unsigned i = 0; i < 496; i++) {
-    EXPECT_EQ(i, bucket_page->KeyAt(i));
-    EXPECT_EQ(i, bucket_page->ValueAt(i));
+    ASSERT_EQ(i, bucket_page->KeyAt(i));
+    ASSERT_EQ(i, bucket_page->ValueAt(i));
   }
 
   assert(bucket_page->IsFull());
   // Cannot insert 496 page
   for (unsigned i = 496; i < 496 * 2; i++) {
-    EXPECT_EQ(false, bucket_page->Insert(i, i, IntComparator()));
+    ASSERT_EQ(false, bucket_page->Insert(i, i, IntComparator()));
   }
 
   // Remove what we inserted
   for (unsigned i = 0; i < 496; i++) {
-    assert(bucket_page->Remove(i, i, IntComparator()));
+    ASSERT_TRUE(bucket_page->Remove(i, i, IntComparator()));
   }
 
-  EXPECT_TRUE(bucket_page->IsEmpty());
+  ASSERT_TRUE(bucket_page->IsEmpty());
 
   // unpin the directory page now that we are done
   bpm->UnpinPage(bucket_page_id, true, nullptr);

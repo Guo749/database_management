@@ -57,6 +57,15 @@ class InsertExecutor : public AbstractExecutor {
   const Schema *GetOutputSchema() override { return plan_->OutputSchema(); };
 
  private:
+  // Performs insertion given raw values.
+  void RawInsert(TableInfo *table_info, const Schema &schema, std::vector<IndexInfo *> *index_infos);
+
+  // Performs insertion given child(s) plan.
+  void ChildPlanInsert(TableInfo *table_info, const Schema &schema, std::vector<IndexInfo *> *index_infos);
+
+  void UpdateIndex(Tuple *tuple, RID *rid, TableInfo *table_info, const Schema schema,
+                   std::vector<IndexInfo *> *index_infos);
+
   /** The insert plan node to be executed*/
   const InsertPlanNode *plan_;
 };

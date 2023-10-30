@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/buffer_pool_manager_instance.h"
+#include <bitset>
 #include <cstdio>
 #include <random>
 #include <string>

@@ -135,7 +135,7 @@ class HashTableBucketPage {
   /**
    * Prints the bucket's occupancy information
    */
-  void PrintBucket();
+  void PrintBucket() const;
 
   std::vector<std::pair<KeyType, ValueType>> GetAllElements();
 
@@ -144,6 +144,11 @@ class HashTableBucketPage {
   bool KeyAndValueExistInArray(KeyType key_type, ValueType value_type, KeyComparator cmp);
 
  private:
+  // The difference between occupied and readable is
+  // Occupied means until this point, all elements are checked, no need to go further
+  // redable is to check if we can read element or not, because there might be case when
+  // tombstone for this position while there are still some elements in the right.
+
   //  For more on BUCKET_ARRAY_SIZE see storage/page/hash_table_page_defs.h
   char occupied_[(BUCKET_ARRAY_SIZE - 1) / 8 + 1];
   // 0 if tombstone/brand new (never occupied), 1 otherwise.

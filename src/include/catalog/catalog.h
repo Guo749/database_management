@@ -191,7 +191,7 @@ class Catalog {
   template <class KeyType, class ValueType, class KeyComparator>
   IndexInfo *CreateIndex(Transaction *txn, const std::string &index_name, const std::string &table_name,
                          const Schema &schema, const Schema &key_schema, const std::vector<uint32_t> &key_attrs,
-                         std::size_t keysize, HashFunction<KeyType> hash_function) {
+                         std::size_t keysize, HashFunction<KeyType> hash_function, bool print) {
     // Reject the creation request for nonexistent table
     if (table_names_.find(table_name) == table_names_.end()) {
       return NULL_INDEX_INFO;
@@ -220,10 +220,19 @@ class Catalog {
     // Populate the index with all tuples in table heap
     auto *table_meta = GetTable(table_name);
     auto *heap = table_meta->table_.get();
+    if (print) {
+      LOG_INFO("Constructing index begin ...====");
+    }
     for (auto tuple = heap->Begin(txn); tuple != heap->End(); ++tuple) {
       index->InsertEntry(tuple->KeyFromTuple(schema, key_schema, key_attrs), tuple->GetRid(), txn);
+      if (print) {
+        Tuple index_tuple = tuple->KeyFromTuple(schema, key_schema, key_attrs);
+        std::cout << index_tuple.ToString(&key_schema) << " \n";
+      }
     }
-
+    if (print) {
+      LOG_INFO("Constructing index end ...====");
+    }
     // Get the next OID for the new index
     const auto index_oid = next_index_oid_.fetch_add(1);
 
