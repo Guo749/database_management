@@ -56,6 +56,6 @@ class SeqScanExecutor : public AbstractExecutor {
    * The container includes all tuples from this execution plan.
    * Note the header is the first element added, while the tail is added later,
    */
-  std::deque<Tuple> tuples_;
+  std::deque<std::pair<Tuple, RID>> tuples_;
 };
 }  // namespace bustub

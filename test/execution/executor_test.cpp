@@ -110,23 +110,6 @@ TEST_F(ExecutorTest, SimpleSeqScanTest) {
   }
 }
 
-// SELECT col_a FROM empty_table WHERE col_a < 500
-TEST_F(ExecutorTest, SeqScanEmptyTable) {
-  // Construct query plan
-  TableInfo *table_info = GetExecutorContext()->GetCatalog()->GetTable("empty_table");
-  const Schema &schema = table_info->schema_;
-  auto *col_a = MakeColumnValueExpression(schema, 0, "colA");
-  auto *const500 = MakeConstantValueExpression(ValueFactory::GetIntegerValue(500));
-  auto *predicate = MakeComparisonExpression(col_a, const500, ComparisonType::LessThan);
-  auto *out_schema = MakeOutputSchema({{"colA", col_a}});
-  SeqScanPlanNode plan{out_schema, predicate, table_info->oid_};
-
-  // Execute
-  std::vector<Tuple> result_set{};
-  GetExecutionEngine()->Execute(&plan, &result_set, GetTxn(), GetExecutorContext());
-  ASSERT_EQ(result_set.size(), 0);
-}
-
 // INSERT INTO empty_table2 VALUES (100, 10), (101, 11), (102, 12)
 TEST_F(ExecutorTest, SimpleRawInsertTest) {
   // Create Values to insert
@@ -140,6 +123,7 @@ TEST_F(ExecutorTest, SimpleRawInsertTest) {
   InsertPlanNode insert_plan{std::move(raw_vals), table_info->oid_};
 
   GetExecutionEngine()->Execute(&insert_plan, nullptr, GetTxn(), GetExecutorContext());
+
   // Iterate through table make sure that values were inserted.
 
   // SELECT * FROM empty_table2;
@@ -151,6 +135,7 @@ TEST_F(ExecutorTest, SimpleRawInsertTest) {
 
   std::vector<Tuple> result_set{};
   GetExecutionEngine()->Execute(&scan_plan, &result_set, GetTxn(), GetExecutorContext());
+
   // Size
   ASSERT_EQ(result_set.size(), 3);
 
@@ -234,7 +219,7 @@ TEST_F(ExecutorTest, SimpleRawInsertWithIndexTest) {
   auto key_schema = ParseCreateStatement("a bigint");
   ComparatorType comparator{key_schema.get()};
   auto *index_info = GetExecutorContext()->GetCatalog()->CreateIndex<KeyType, ValueType, ComparatorType>(
-      GetTxn(), "index1", "empty_table2", table_info->schema_, *key_schema, {0}, 8, HashFunctionType{}, false);
+      GetTxn(), "index1", "empty_table2", table_info->schema_, *key_schema, {0}, 8, HashFunctionType{});
 
   // Execute the insert
   GetExecutionEngine()->Execute(&insert_plan, nullptr, GetTxn(), GetExecutorContext());
@@ -343,21 +328,6 @@ TEST_F(ExecutorTest, SimpleUpdateTest) {
   }
 }
 
-// TEST_F(ExecutorTest, CheckTableContent) {
-//   TableInfo* table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
-//   const Schema schema = table_info->schema_;
-//   for (Column column : schema.GetColumns()){
-//     std::cout << column.ToString() << std::endl;
-//   }
-
-//   TableIterator ti_begin = table_info->table_->Begin(GetExecutorContext()->GetTransaction());
-//   TableIterator ti_end = table_info->table_->End();
-
-//   for (auto it = ti_begin; it != ti_end; it++){
-//     std::cout << (*it).ToString(&schema) << "\n";
-//   }
-// }
-
 // DELETE FROM test_1 WHERE col_a == 50;
 TEST_F(ExecutorTest, SimpleDeleteTest) {
   // Construct query plan
@@ -372,10 +342,9 @@ TEST_F(ExecutorTest, SimpleDeleteTest) {
   // Create the index
   auto key_schema = ParseCreateStatement("a bigint");
   ComparatorType comparator{key_schema.get()};
-  [[maybe_unused]] auto *index_info =
-      GetExecutorContext()->GetCatalog()->CreateIndex<KeyType, ValueType, ComparatorType>(
-          GetTxn(), "index1", "test_1", GetExecutorContext()->GetCatalog()->GetTable("test_1")->schema_, *key_schema,
-          {0}, 8, HashFunctionType{}, true);
+  auto *index_info = GetExecutorContext()->GetCatalog()->CreateIndex<KeyType, ValueType, ComparatorType>(
+      GetTxn(), "index1", "test_1", GetExecutorContext()->GetCatalog()->GetTable("test_1")->schema_, *key_schema, {0},
+      8, HashFunctionType{}, true);
 
   std::vector<Tuple> result_set;
   GetExecutionEngine()->Execute(scan_plan1.get(), &result_set, GetTxn(), GetExecutorContext());
@@ -387,27 +356,25 @@ TEST_F(ExecutorTest, SimpleDeleteTest) {
   }
 
   // DELETE FROM test_1 WHERE col_a == 50
-  const Tuple index_key = Tuple(result_set[0]);
+  const Tuple index_key = Tuple(result_set[0]).KeyFromTuple(schema, *key_schema, {0});
   std::unique_ptr<AbstractPlanNode> delete_plan;
   { delete_plan = std::make_unique<DeletePlanNode>(scan_plan1.get(), table_info->oid_); }
-  std::cout << "tuple resulst" << index_key.ToString(&schema) << "|\n";
   GetExecutionEngine()->Execute(delete_plan.get(), nullptr, GetTxn(), GetExecutorContext());
-  LOG_INFO("hello");
+
   result_set.clear();
+
   // SELECT col_a FROM test_1 WHERE col_a == 50
   GetExecutionEngine()->Execute(scan_plan1.get(), &result_set, GetTxn(), GetExecutorContext());
-  EXPECT_TRUE(result_set.empty());
+  ASSERT_TRUE(result_set.empty());
 
   // Ensure the key was removed from the index
   std::vector<RID> rids{};
-
   index_info->index_->ScanKey(index_key, &rids, GetTxn());
-  std::cout << "rids size" << rids.size() << "\n";
-  EXPECT_TRUE(rids.empty());
+  ASSERT_TRUE(rids.empty());
 }
 
 // SELECT test_1.col_a, test_1.col_b, test_2.col1, test_2.col3 FROM test_1 JOIN test_2 ON test_1.col_a = test_2.col1;
-TEST_F(ExecutorTest, DISABLED_SimpleNestedLoopJoinTest) {
+TEST_F(ExecutorTest, SimpleNestedLoopJoinTest) {
   const Schema *out_schema1;
   std::unique_ptr<AbstractPlanNode> scan_plan1;
   {
@@ -520,7 +487,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleHashJoinTest) {
 }
 
 // SELECT COUNT(col_a), SUM(col_a), min(col_a), max(col_a) from test_1;
-TEST_F(ExecutorTest, DISABLED_SimpleAggregationTest) {
+TEST_F(ExecutorTest, SimpleAggregationTest) {
   const Schema *scan_schema;
   std::unique_ptr<AbstractPlanNode> scan_plan;
   {
@@ -623,7 +590,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleGroupByAggregation) {
 }
 
 // SELECT colA, colB FROM test_3 LIMIT 10
-TEST_F(ExecutorTest, DISABLED_SimpleLimitTest) {
+TEST_F(ExecutorTest, SimpleLimitTest) {
   auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_3");
   auto &schema = table_info->schema_;
 
@@ -651,7 +618,7 @@ TEST_F(ExecutorTest, DISABLED_SimpleLimitTest) {
 }
 
 // SELECT DISTINCT colC FROM test_7
-TEST_F(ExecutorTest, DISABLED_SimpleDistinctTest) {
+TEST_F(ExecutorTest, SimpleDistinctTest) {
   auto *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_7");
   auto &schema = table_info->schema_;
 

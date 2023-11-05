@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <deque>
 #include <memory>
 #include <utility>
 
@@ -55,6 +56,9 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
  private:
   /** The NestedLoopJoin plan node to be executed. */
   const NestedLoopJoinPlanNode *plan_;
+  std::unique_ptr<AbstractExecutor> left_executor_;
+  std::unique_ptr<AbstractExecutor> right_executor_;
+  std::deque<Tuple> result_;
 };
 
 }  // namespace bustub

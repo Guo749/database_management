@@ -86,9 +86,7 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
   HashTableDirectoryPage *directory_page = FetchDirectoryPage();
   uint32_t bucket_index = KeyToDirectoryIndex(key, directory_page);
   HASH_TABLE_BUCKET_TYPE *bucket_page = FetchBucketPage(directory_page->GetBucketPageId(bucket_index));
-
   bool res = bucket_page->GetValue(key, comparator_, result);
-
   table_latch_.RUnlock();
   return res;
 }
@@ -232,10 +230,8 @@ void HASH_TABLE_TYPE::CreatePageAndUpdateDirectory(const KeyType &key, const Val
 
         assert(page_to_local_depth.count(page_id) != 0);
 
-
         directory_page->SetLocalDepth(i, page_to_local_depth[page_id]);
         match++;
-
       }
     }
 

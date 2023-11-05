@@ -72,5 +72,6 @@ class AbstractExpression {
   std::vector<const AbstractExpression *> children_;
   /** The return type of this expression. */
   TypeId ret_type_;
+  std::vector<std::pair<Tuple, RID>> result_;
 };
 }  // namespace bustub

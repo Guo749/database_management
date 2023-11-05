@@ -191,7 +191,7 @@ class Catalog {
   template <class KeyType, class ValueType, class KeyComparator>
   IndexInfo *CreateIndex(Transaction *txn, const std::string &index_name, const std::string &table_name,
                          const Schema &schema, const Schema &key_schema, const std::vector<uint32_t> &key_attrs,
-                         std::size_t keysize, HashFunction<KeyType> hash_function, bool print) {
+                         std::size_t keysize, HashFunction<KeyType> hash_function, bool print = false) {
     // Reject the creation request for nonexistent table
     if (table_names_.find(table_name) == table_names_.end()) {
       return NULL_INDEX_INFO;

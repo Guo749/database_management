@@ -185,6 +185,14 @@ class AggregationExecutor : public AbstractExecutor {
   const AbstractExecutor *GetChildExecutor() const;
 
  private:
+  // Get all aggregate keys, converted from Aggregated expression.
+  // like {{column 0, col a}, {column 1, col b}}
+  // Format <ColIndex, ColumnType -- Value>
+  std::unordered_map<uint32_t, Value> GetAggregateKeys();
+
+  // Based on output schema and hash table, generates the result tuple.
+  void GenerateResultTuple(std::unordered_map<uint32_t, Value> &aggregate_keys);
+
   /** @return The tuple as an AggregateKey */
   AggregateKey MakeAggregateKey(const Tuple *tuple) {
     std::vector<Value> keys;
@@ -209,8 +217,10 @@ class AggregationExecutor : public AbstractExecutor {
   /** The child executor that produces tuples over which the aggregation is computed */
   std::unique_ptr<AbstractExecutor> child_;
   /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
+  Tuple result_tuple_;
+  bool has_seen_result_;
 };
 }  // namespace bustub

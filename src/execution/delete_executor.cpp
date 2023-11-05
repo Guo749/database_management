@@ -29,20 +29,22 @@ void DeleteExecutor::Init() {
   RID rid;
   // Deletes the records.
   while (child_executor_->Next(&tuple, &rid)) {
+    std::cout << tuple.ToString(child_executor_->GetOutputSchema()) << " wenchao123 \n";
+    std::cout << rid.ToString() << "\n";
     bool res = table_info->table_->MarkDelete(rid, exec_ctx_->GetTransaction());
+
     if (!res) {
       LOG_ERROR("cannot delete record");
     }
-    std::cout << tuple.ToString(&(table_info->schema_)) << std::endl;
-    std::cout << rid.ToString() << std::endl;
+
     // Also updates index
     std::vector<IndexInfo *> index_infos = exec_ctx_->GetCatalog()->GetTableIndexes(table_info->name_);
     for (IndexInfo *index_info : index_infos) {
-      std::cout << "tuple " << tuple.ToString(&(table_info->schema_)) << "\n";
-      index_info->index_->DeleteEntry(tuple, rid, exec_ctx_->GetTransaction());
-      LOG_INFO("hello 456");
+      Tuple index_tuple =
+          tuple.KeyFromTuple(table_info->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
+      std::cout << "index tuple " << index_tuple.ToString(&(index_info->key_schema_)) << "\n";
+      index_info->index_->DeleteEntry(index_tuple, rid, exec_ctx_->GetTransaction());
     }
-    LOG_INFO("hello412");
   }
 }
 

@@ -12,7 +12,9 @@
 
 #pragma once
 
+#include <deque>
 #include <memory>
+#include <unordered_set>
 #include <utility>
 
 #include "execution/executors/abstract_executor.h"
@@ -53,5 +55,7 @@ class DistinctExecutor : public AbstractExecutor {
   const DistinctPlanNode *plan_;
   /** The child executor from which tuples are obtained */
   std::unique_ptr<AbstractExecutor> child_executor_;
+  std::deque<Tuple> result_;
+  std::unordered_set<std::string> has_seen_;
 };
 }  // namespace bustub
