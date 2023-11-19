@@ -17,6 +17,8 @@
 #include "type/value_factory.h"
 #include "type/varlen_type.h"
 
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace bustub {
 
 TimestampType::TimestampType() : Type(TypeId::TIMESTAMP) {}

@@ -109,6 +109,12 @@ class LockManager {
 
   /** Lock table for lock requests. */
   std::unordered_map<RID, LockRequestQueue> lock_table_;
+
+  // Checks which txn holds which shared lock for RID
+  std::unordered_map<RID, std::unordered_set<txn_id_t>> shared_locks_hold_by_txn_;
+
+  // Checks which txn holds which exclusive lock for RID
+  std::unordered_map<RID, Transaction*> exclusive_locks_hold_by_txn_;
 };
 
 }  // namespace bustub

@@ -77,7 +77,7 @@ void BasicTest1() {
     delete txns[i];
   }
 }
-TEST(LockManagerTest, DISABLED_BasicTest) { BasicTest1(); }
+TEST(LockManagerTest, BasicTest) { BasicTest1(); }
 
 void TwoPLTest() {
   LockManager lock_mgr{};
@@ -123,7 +123,7 @@ void TwoPLTest() {
 
   delete txn;
 }
-TEST(LockManagerTest, DISABLED_TwoPLTest) { TwoPLTest(); }
+TEST(LockManagerTest, TwoPLTest) { TwoPLTest(); }
 
 void UpgradeTest() {
   LockManager lock_mgr{};
@@ -150,7 +150,7 @@ void UpgradeTest() {
   txn_mgr.Commit(&txn);
   CheckCommitted(&txn);
 }
-TEST(LockManagerTest, DISABLED_UpgradeLockTest) { UpgradeTest(); }
+TEST(LockManagerTest, UpgradeLockTest) { UpgradeTest(); }
 
 void WoundWaitBasicTest() {
   LockManager lock_mgr{};
@@ -178,7 +178,7 @@ void WoundWaitBasicTest() {
     // wait for txn 0 to call lock_exclusive(), which should wound us
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-    CheckAborted(&txn_die);
+    EXPECT_EQ(txn_die.GetState(), TransactionState::ABORTED);
 
     // unlock
     txn_mgr.Abort(&txn_die);
@@ -200,8 +200,8 @@ void WoundWaitBasicTest() {
 
   CheckGrowing(&txn_hold);
   txn_mgr.Commit(&txn_hold);
-  CheckCommitted(&txn_hold);
+  EXPECT_EQ(txn_hold.GetState(), TransactionState::COMMITTED);
 }
-TEST(LockManagerTest, DISABLED_WoundWaitBasicTest) { WoundWaitBasicTest(); }
+TEST(LockManagerTest, WoundWaitBasicTest) { WoundWaitBasicTest(); }
 
 }  // namespace bustub
